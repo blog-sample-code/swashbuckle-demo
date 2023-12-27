@@ -1,4 +1,3 @@
-using IronXL;
 using Microsoft.AspNetCore.Mvc;
 
 namespace RestFullMinimalApi.Controllers;
@@ -30,16 +29,16 @@ public class WeatherForecastController : ControllerBase
     public IEnumerable<WeatherForecast> Get()
     {
         return Enumerable.Range(1, 5).Select(index => new WeatherForecast
-        {
-            Date = DateTime.Now.AddDays(index),
-            TemperatureC = Random.Shared.Next(-20, 55),
-            Summary = Summaries[Random.Shared.Next(Summaries.Length)]
-        })
+            {
+                Date = DateTime.Now.AddDays(index),
+                TemperatureC = Random.Shared.Next(-20, 55),
+                Summary = Summaries[Random.Shared.Next(Summaries.Length)]
+            })
             .ToArray();
     }
 
     /// <summary>
-    /// Retrieves WeatherForecast as Excel
+    /// Retrieves WeatherForecast as Pdf
     /// </summary>
     /// <remarks>Awesomeness!</remarks>
     /// <response code="200">Retrieved</response>
@@ -54,37 +53,45 @@ public class WeatherForecastController : ControllerBase
             TemperatureC = Random.Shared.Next(-20, 55),
             Summary = Summaries[Random.Shared.Next(Summaries.Length)]
         }).ToArray();
-        // Create new Excel WorkBook document.
-        WorkBook workBook = WorkBook.Create(ExcelFileFormat.XLSX);
-        workBook.Metadata.Author = "IronXL";
 
-        // Add a blank WorkSheet
-        WorkSheet workSheet = workBook.CreateWorkSheet("main_sheet");
+        var html = GetHtml(results);
+        var Renderer = new ChromePdfRenderer();
+        var PDF = Renderer.RenderHtmlAsPdf(html);
+        var fileName = "WeatherReport.pdf";
+        PDF.SaveAs(fileName);
 
-        // Add data and styles to the new worksheet
-        workSheet["A1"].Value = "Date";
-        workSheet["A1"].Style.BottomBorder.Type = IronXL.Styles.BorderType.Thick;
-        workSheet["B1"].Value = "TemperatureC";
-        workSheet["B1"].Style.BottomBorder.Type = IronXL.Styles.BorderType.Thick;
-        workSheet["C1"].Value = "TemperatureF";
-        workSheet["C1"].Style.BottomBorder.Type = IronXL.Styles.BorderType.Thick;
-        workSheet["D1"].Value = "Summary";
-        workSheet["D1"].Style.BottomBorder.Type = IronXL.Styles.BorderType.Thick;
-
-
-        var row = 1;
-        foreach (var item in results)
-        {
-            row++;
-            workSheet[$"A{row}"].Value = item.Date.ToShortDateString();
-            workSheet[$"B{row}"].Value = item.TemperatureC;
-            workSheet[$"C{row}"].Value = item.TemperatureF;
-            workSheet[$"D{row}"].Value = item.Summary;
-
-        }
-
+        var stream = new FileStream(fileName, FileMode.Open);
 
         // Save the excel file
-        return new FileStreamResult(workBook.ToStream(), "application/octet-stream") { FileDownloadName = "weather.xlsx" };
+        return new FileStreamResult(stream, "application/octet-stream") { FileDownloadName = fileName };
+    }
+
+    private static string GetHtml(WeatherForecast[] weatherForecasts)
+    {
+        string header = $@"
+<html>
+<head><title>WeatherForecast</title></head>
+<body>
+<h1>WeatherForecast</h1>
+    ";
+        var footer = @"
+</body>
+</html>";
+
+        var htmlContent = header;
+
+        foreach (var weather in weatherForecasts)
+        {
+            htmlContent += $@"
+    <h2>{weather.Date}</h2>
+    <p>Summary: {weather.Summary}</p>
+    <p>Temperature in Celcius: {weather.TemperatureC}</p>
+    <p>Temperature in Farenheit: {weather.TemperatureF}</p>
+";
+        }
+
+        htmlContent += footer;
+
+        return htmlContent;
     }
 }
